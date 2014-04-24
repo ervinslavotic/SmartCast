@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Project</string>
+    <string name="action_settings">Settings</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="title_activity_test">TestActivity</string>
+    <string name="title_activity_tab1">Tab1Activity</string>
+    <string name="title_activity_tab2">Tab1Activity2</string>
+    <string name="tab1_activity">Hello from tab1 activity </string>
+    <string name="title_activity_stream">StreamActivity</string>
+    <string name="podcast_uri">/storage/sdcard0/smartcast/</string>
+
+</resources>
