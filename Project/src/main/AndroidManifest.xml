@@ -1,10 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" >
 
     <application>
-        <activity android:name=".........src.com.smartcast.project.FeedActivity"
-            android:label="@string/title_activity_feed"
-            >
+        <activity
+            android:name=".........src.com.smartcast.project.FeedActivity"
+            android:label="@string/title_activity_feed" >
         </activity>
+
+        <service
+            android:name=".........src.com.smartcast.project.PlayerService"
+            android:enabled="true"
+            android:exported="true" >
+        </service>
     </application>
 
 </manifest>

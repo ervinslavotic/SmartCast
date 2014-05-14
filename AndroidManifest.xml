@@ -36,6 +36,7 @@
             android:name="com.smartcast.project.FeedActivity"
             android:label="@string/title_activity_tab2" >
         </activity>
+        <service android:name=".PlayerService"/>
     </application>
 
 </manifest>

@@ -93,9 +93,11 @@ public class StreamActivity extends ListActivity {
         listView.setOnItemClickListener(new OnItemClickListener() {
             public void onItemClick(AdapterView<?> parent, View itemView, int itemPosition, long itemId) {
 
-                Intent intent = new Intent(getApplicationContext(), MainActivity.class);
-                intent.putExtra("userSelect", listItems.get(itemPosition));
-;               startActivity(intent);
+                String tempPath = getString(R.string.podcast_uri);
+                Intent intent = new Intent(getApplicationContext(), PlayerService.class);
+                intent.putExtra("nextOnQueue", tempPath + listItems.get(itemPosition));
+;              // startActivity(intent);
+                startService(intent);
             }
         });
 
