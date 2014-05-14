@@ -1,10 +1,16 @@
 package com.smartcast.project;
 
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.media.MediaPlayer;
+import android.telephony.PhoneStateListener;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.widget.Toast;
 // this is the various listeners needed here
@@ -25,7 +31,12 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
     private MediaPlayer mediaPlayer = new MediaPlayer();
     private String setPodcastLink;
     private String currentPodcast;// current podcast playing
-
+    //notification ID
+    private static final int NOTIFICATION_ID = 1;
+    //for incoming call vars
+    private boolean isPausedInCall = false;
+    private PhoneStateListener phoneStateListener;
+    private TelephonyManager telephonyManager;
 
     public void onCreate(){
 
@@ -46,6 +57,38 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
     ================================================================================*/
     public int onStartCommand(Intent intent, int flags, int startId){
 
+        //manage incoming phonecalls, resume on hangup
+        Log.v("Phone", "Starting telephony");
+        telephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
+        Log.v("Phone", "Starting listener");
+        phoneStateListener = new PhoneStateListener(){
+        // method for call states
+            public void onCallStateChanged(int state, String incomingNumber){
+                   switch (state){
+                       case TelephonyManager.CALL_STATE_OFFHOOK:
+                       case TelephonyManager.CALL_STATE_RINGING:
+                           if(mediaPlayer != null){
+                               pausePodcast();
+                               isPausedInCall = true;
+                           }
+                           break;
+                       case TelephonyManager.CALL_STATE_IDLE:
+                           //start playing its idle
+                           if(mediaPlayer != null){
+                               if(isPausedInCall){
+                                   isPausedInCall = false;
+                                   playPodcast();
+                               }
+                           }
+                           break;
+                   }
+            }
+        };
+
+        //register listener with telephony manager
+        telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
+        // show notification
+        initNotification();
         // looks in the folder the rder it came i to start playing
         currentPodcast = intent.getExtras().getString("nextOnQueue");
         mediaPlayer.reset();// reset the player
@@ -86,7 +129,14 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
             }
             mediaPlayer.release();// releases all memory media player is holding
         }
+
+        //turn phone listener call off
+        if(phoneStateListener != null){
+            telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE);
+        }
         Toast.makeText(this, "Player has stopped", Toast.LENGTH_LONG).show();
+        //cancel the notification
+        cancelNotification();
     }
 
 
@@ -203,6 +253,21 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
 
     /*===============================================================================
     ===============================================================================
+    - PAUSE PODCAST METHOD
+    -called from phoneListener
+
+    ===============================================================================
+    ================================================================================*/
+    public void pausePodcast(){
+        //start the mediaplayer
+        if(mediaPlayer.isPlaying()){
+            mediaPlayer.pause();
+            Globals.btnPlay.setImageResource(R.drawable.btn_play);
+        }
+    }
+
+    /*===============================================================================
+    ===============================================================================
     - STOP PODCAST METHOD
     -called from oncompletion method
 
@@ -217,4 +282,42 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
         }
     }
 
+
+    /*===============================================================================
+    ===============================================================================
+    - START NOTIFICATION
+    - called form on start command
+    - initializes the notification panel
+    ===============================================================================
+    ================================================================================*/
+    private void initNotification(){
+
+        String ns = Context.NOTIFICATION_SERVICE;//get the service going
+        NotificationManager notificationManager =(NotificationManager) getSystemService(ns);
+        int icon = R.drawable.icon;//
+        CharSequence tickerText = "SmartCast";
+        long when = System.currentTimeMillis();
+        Notification notification = new Notification(icon, tickerText, when);
+        notification.flags = Notification.FLAG_ONGOING_EVENT;
+        Context context = getApplicationContext();
+        CharSequence contentTitle = "SmartCast";
+        CharSequence contentText = " Listen to podcast on the go ";
+        Intent notificationIntent= new Intent(this, MainActivity.class);
+        PendingIntent contentIntent = PendingIntent.getActivity(context, 0, notificationIntent, 0);
+        notification.setLatestEventInfo(context, contentTitle, contentText, contentIntent);
+        notificationManager.notify(NOTIFICATION_ID, notification);
+
+    }
+    /*===============================================================================
+    ===============================================================================
+    - STOP NOTIFICATION
+    - called form on DESTROY command
+    - stops the notification panel
+    ===============================================================================
+    ================================================================================*/
+    private void cancelNotification(){
+        String ns = Context.NOTIFICATION_SERVICE;
+        NotificationManager notificationManager = (NotificationManager) getSystemService(ns);
+        notificationManager.cancel(NOTIFICATION_ID);
+    }
 }

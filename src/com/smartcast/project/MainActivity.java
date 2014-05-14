@@ -185,6 +185,7 @@ public class MainActivity extends ActivityGroup {
                 stopPodcastService();
                 Globals.podcastPlaying = false;
             }
+            Globals.btnPlay.setImageResource(R.drawable.btn_play);
         }
     }
 
