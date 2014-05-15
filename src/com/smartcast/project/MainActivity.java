@@ -3,6 +3,8 @@ package com.smartcast.project;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import android.view.MotionEvent;
+import android.widget.SeekBar;
 import android.media.MediaPlayer;
 import android.media.MediaPlayer.OnCompletionListener;
 import android.os.Bundle;
@@ -31,7 +33,7 @@ import java.io.IOException;
 
 	 */
 
-public class MainActivity extends ActivityGroup {
+public class MainActivity extends ActivityGroup implements View.OnTouchListener {
 
 
 	// Media Player
@@ -45,6 +47,8 @@ public class MainActivity extends ActivityGroup {
     public Intent serviceIntent;
     private String setPodcastLink;
     private String currentPodcast;
+    private int lengthTime;
+
     //private boolean podcastPlaying = false;
 
 
@@ -133,7 +137,10 @@ public class MainActivity extends ActivityGroup {
         // creating tab within two tabhosts
 
 
-
+        //seekbar
+        Globals.seekBarProgress = (SeekBar)findViewById(R.id.songProgressBar);
+        Globals.seekBarProgress.setMax(99);// means 100%
+        Globals.seekBarProgress.setOnTouchListener(this);
 
 
     }
@@ -160,6 +167,7 @@ public class MainActivity extends ActivityGroup {
             public void onClick(View arg0) {
                 // check for already playing
                 buttonPlayStopClick();
+                initProgressBar();
             }
         });
 	}
@@ -233,6 +241,23 @@ public class MainActivity extends ActivityGroup {
             Toast.makeText(getApplicationContext(), e.getClass().getName() + " " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
         Globals.podcastPlaying = false;
+
+    }
+
+
+    /*===============================================================================
+      ===============================================================================
+     -ON TOUCH LISTENER
+
+     ===============================================================================
+     ================================================================================*/
+     public boolean onTouch(View v, MotionEvent motionEvent){
+
+        return false;
+    }
+
+
+    public void initProgressBar(){
 
     }
 }

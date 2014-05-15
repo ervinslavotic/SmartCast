@@ -1,7 +1,7 @@
 package com.smartcast.project;
 
 import android.widget.ImageButton;
-
+import android.widget.SeekBar;
 /**
  * Created by Slavotic on 14/05/14.
  * Allowing access to global members to each class
@@ -12,4 +12,5 @@ public class Globals {
 
     public static boolean podcastPlaying = false;
     public static ImageButton btnPlay;
+    public static SeekBar seekBarProgress;
 }

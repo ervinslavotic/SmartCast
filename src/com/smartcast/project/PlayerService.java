@@ -20,7 +20,7 @@ import android.media.MediaPlayer.OnErrorListener;
 import android.media.MediaPlayer.OnInfoListener;
 import android.media.MediaPlayer.OnPreparedListener;
 import android.media.MediaPlayer.OnSeekCompleteListener;
-
+import android.os.Handler;
 import java.io.IOException;
 
 //player needs to extend all of thes listeners
@@ -38,7 +38,32 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
     private PhoneStateListener phoneStateListener;
     private TelephonyManager telephonyManager;
 
+    // seek bar postion vars
+    int podcastFileLengthInMilliSeconds;
+    String sntSeekPos; // seek position
+    int seekPosition;
+    int podcastPosition;
+    int podcastMax;
+    private final Handler handler = new Handler();// used for multithreadedness
+    private static int songEnded;
+    public static final String BROADCAST_ACTION ="com.smartcast.project.seekprogress";
+
+    //setup broadcast identifier
+    public static final String BROADCAST_BUFFER = "com.smartcast.project.broadcastbuffer";
+    Intent bufferIntent;
+    Intent seekIntent;
+
+    /*===============================================================================
+     ===============================================================================
+    - ONCREATE
+    - for seekbar we need an intent
+    ===============================================================================
+    ================================================================================*/
     public void onCreate(){
+
+        bufferIntent = new Intent(BROADCAST_BUFFER);
+        //setup progress bar
+        seekIntent = new Intent(BROADCAST_ACTION);
 
         mediaPlayer.setOnCompletionListener(this);
         mediaPlayer.setOnErrorListener(this);
@@ -56,6 +81,7 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
     ===============================================================================
     ================================================================================*/
     public int onStartCommand(Intent intent, int flags, int startId){
+
 
         //manage incoming phonecalls, resume on hangup
         Log.v("Phone", "Starting telephony");
@@ -89,10 +115,17 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
         telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
         // show notification
         initNotification();
+
+        // init the progress bar
+        initProgressbar();
         // looks in the folder the rder it came i to start playing
         currentPodcast = intent.getExtras().getString("nextOnQueue");
         mediaPlayer.reset();// reset the player
         Toast.makeText(this, "Player has started", Toast.LENGTH_LONG).show();
+
+
+        // set up the progressbar
+
 
         //setup media player using the link
         if(!mediaPlayer.isPlaying()){
@@ -146,7 +179,9 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
 
   ===============================================================================
   ================================================================================*/
-    public void onBufferingUpdate(MediaPlayer mp, int arg0){
+    public void onBufferingUpdate(MediaPlayer mp, int percent){
+        //set progress
+        Globals.seekBarProgress.setSecondaryProgress(percent);
 
     }
 
@@ -319,5 +354,30 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
         String ns = Context.NOTIFICATION_SERVICE;
         NotificationManager notificationManager = (NotificationManager) getSystemService(ns);
         notificationManager.cancel(NOTIFICATION_ID);
+    }
+
+    /*===============================================================================
+    ===============================================================================
+    - START PROGRESS BAR
+
+
+    ===============================================================================
+    ================================================================================*/
+    private void initProgressbar(){
+
+        podcastFileLengthInMilliSeconds = mediaPlayer.getDuration();
+        primarySeekBarUpdater();
+    }
+
+    /*===============================================================================
+    ===============================================================================
+    - PRIMARY PROGRESS BAR
+
+
+    ===============================================================================
+    ================================================================================*/
+    private void primarySeekBarUpdater(){
+
+
     }
 }
