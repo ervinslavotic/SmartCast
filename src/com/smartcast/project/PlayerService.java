@@ -4,8 +4,10 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.media.MediaPlayer;
@@ -28,7 +30,7 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
         OnInfoListener, OnSeekCompleteListener, OnPreparedListener{
     // backround service of the player
     // the media player
-    private MediaPlayer mediaPlayer = new MediaPlayer();
+
     private String setPodcastLink;
     private String currentPodcast;// current podcast playing
     //notification ID
@@ -61,17 +63,17 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
     ================================================================================*/
     public void onCreate(){
 
-        bufferIntent = new Intent(BROADCAST_BUFFER);
+        //bufferIntent = new Intent(BROADCAST_BUFFER);
         //setup progress bar
         seekIntent = new Intent(BROADCAST_ACTION);
 
-        mediaPlayer.setOnCompletionListener(this);
-        mediaPlayer.setOnErrorListener(this);
-        mediaPlayer.setOnBufferingUpdateListener(this);
-        mediaPlayer.setOnInfoListener(this);
-        mediaPlayer.setOnSeekCompleteListener(this);
-        mediaPlayer.setOnPreparedListener(this);
-        mediaPlayer.reset();
+        Globals.mediaPlayer.setOnCompletionListener(this);
+        Globals.mediaPlayer.setOnErrorListener(this);
+        Globals.mediaPlayer.setOnBufferingUpdateListener(this);
+        Globals.mediaPlayer.setOnInfoListener(this);
+        Globals.mediaPlayer.setOnSeekCompleteListener(this);
+        Globals.mediaPlayer.setOnPreparedListener(this);
+        Globals.mediaPlayer.reset();
 
     }
     /*===============================================================================
@@ -82,7 +84,8 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
     ================================================================================*/
     public int onStartCommand(Intent intent, int flags, int startId){
 
-
+        //register a reciever to broadcast where the seekbar is being pulled to
+        registerReceiver(broadcastReceiver, new IntentFilter(MainActivity.BROADCAST_SEEKBAR));
         //manage incoming phonecalls, resume on hangup
         Log.v("Phone", "Starting telephony");
         telephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
@@ -93,14 +96,14 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
                    switch (state){
                        case TelephonyManager.CALL_STATE_OFFHOOK:
                        case TelephonyManager.CALL_STATE_RINGING:
-                           if(mediaPlayer != null){
+                           if(Globals.mediaPlayer != null){
                                pausePodcast();
                                isPausedInCall = true;
                            }
                            break;
                        case TelephonyManager.CALL_STATE_IDLE:
                            //start playing its idle
-                           if(mediaPlayer != null){
+                           if(Globals.mediaPlayer != null){
                                if(isPausedInCall){
                                    isPausedInCall = false;
                                    playPodcast();
@@ -117,10 +120,10 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
         initNotification();
 
         // init the progress bar
-        initProgressbar();
+     //   initProgressbar();
         // looks in the folder the rder it came i to start playing
         currentPodcast = intent.getExtras().getString("nextOnQueue");
-        mediaPlayer.reset();// reset the player
+        Globals.mediaPlayer.reset();// reset the player
         Toast.makeText(this, "Player has started", Toast.LENGTH_LONG).show();
 
 
@@ -128,10 +131,10 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
 
 
         //setup media player using the link
-        if(!mediaPlayer.isPlaying()){
+        if(!Globals.mediaPlayer.isPlaying()){
             try{
-                mediaPlayer.setDataSource(currentPodcast);
-                mediaPlayer.prepareAsync();// making it async so its not holding up resources
+                Globals.mediaPlayer.setDataSource(currentPodcast);
+                Globals.mediaPlayer.prepareAsync();// making it async so its not holding up resources
                // mediaPlayer.start();
             }
             catch(IOException e){
@@ -144,6 +147,9 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
                 e.printStackTrace();
             }
         }
+
+        //setting up the handler for seekbar
+        setupHandler();
         return START_STICKY;
     }
 
@@ -156,11 +162,11 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
     public void onDestroy(){
 
         super.onDestroy();
-        if(mediaPlayer != null){
-            if(mediaPlayer.isPlaying()){
-                mediaPlayer.stop();
+        if(Globals.mediaPlayer != null){
+            if(Globals.mediaPlayer.isPlaying()){
+                Globals.mediaPlayer.stop();
             }
-            mediaPlayer.release();// releases all memory media player is holding
+            Globals.mediaPlayer.release();// releases all memory media player is holding
         }
 
         //turn phone listener call off
@@ -170,6 +176,12 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
         Toast.makeText(this, "Player has stopped", Toast.LENGTH_LONG).show();
         //cancel the notification
         cancelNotification();
+        //unregister reciever for the seekbar position drag
+        unregisterReceiver(broadcastReceiver);
+        //stop sending updates to the seekbar
+        handler.removeCallbacks(sendUpdatesToUI);
+
+
     }
 
 
@@ -181,7 +193,7 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
   ================================================================================*/
     public void onBufferingUpdate(MediaPlayer mp, int percent){
         //set progress
-        Globals.seekBarProgress.setSecondaryProgress(percent);
+        //Globals.seekBarProgress.setSecondaryProgress(percent);
 
     }
 
@@ -238,11 +250,13 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
     /*===============================================================================
      ===============================================================================
     - ON SEEK METHOD
-
+    - this is for the seekbar
     ===============================================================================
     ================================================================================*/
     public void onSeekComplete(MediaPlayer mp){
-
+        if(!Globals.mediaPlayer.isPlaying()){
+            playPodcast();
+        }
     }
     /*===============================================================================
      ===============================================================================
@@ -279,8 +293,8 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
     ================================================================================*/
     public void playPodcast(){
         //start the mediaplayer
-        if(!mediaPlayer.isPlaying()){
-            mediaPlayer.start();
+        if(!Globals.mediaPlayer.isPlaying()){
+            Globals.mediaPlayer.start();
             Globals.podcastPlaying = true;
             Globals.btnPlay.setImageResource(R.drawable.btn_pause);
         }
@@ -295,8 +309,8 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
     ================================================================================*/
     public void pausePodcast(){
         //start the mediaplayer
-        if(mediaPlayer.isPlaying()){
-            mediaPlayer.pause();
+        if(Globals.mediaPlayer.isPlaying()){
+            Globals.mediaPlayer.pause();
             Globals.btnPlay.setImageResource(R.drawable.btn_play);
         }
     }
@@ -310,8 +324,8 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
     ================================================================================*/
     public void stopPodcast(){
         //stop the mediaplayer
-        if(mediaPlayer.isPlaying()){
-            mediaPlayer.stop();
+        if(Globals.mediaPlayer.isPlaying()){
+            Globals.mediaPlayer.stop();
             Globals.podcastPlaying = false;
             Globals.btnPlay.setImageResource(R.drawable.btn_play);
         }
@@ -356,28 +370,77 @@ public class PlayerService extends Service implements OnCompletionListener, OnBu
         notificationManager.cancel(NOTIFICATION_ID);
     }
 
-    /*===============================================================================
-    ===============================================================================
-    - START PROGRESS BAR
 
 
-    ===============================================================================
-    ================================================================================*/
-    private void initProgressbar(){
-
-        podcastFileLengthInMilliSeconds = mediaPlayer.getDuration();
-        primarySeekBarUpdater();
-    }
 
     /*===============================================================================
     ===============================================================================
-    - PRIMARY PROGRESS BAR
-
-
+    - SETUP THE HANDLER HERE FOR THE SEEKBAR
+    -- seekbar code is here
+    -- everything wee need is here for the seekbar
     ===============================================================================
     ================================================================================*/
-    private void primarySeekBarUpdater(){
-
+    private void setupHandler(){
+        handler.removeCallbacks(sendUpdatesToUI);
+        handler.postDelayed(sendUpdatesToUI, 1000);
 
     }
+
+    // sends updates to the UI for the podcast playing position
+    private Runnable sendUpdatesToUI = new Runnable(){
+
+        public void run(){
+            LogPodcastPosition();
+            handler.postDelayed(this, 1000);//1 seconds
+        }
+    };
+
+    private void LogPodcastPosition(){
+        if(Globals.mediaPlayer.isPlaying()){
+            //every second the seek bar does this
+            podcastPosition = Globals.mediaPlayer.getCurrentPosition();
+
+            podcastMax = Globals.mediaPlayer.getDuration();
+            seekIntent.putExtra("counter", String.valueOf(podcastPosition));
+            seekIntent.putExtra("duration", String.valueOf(podcastMax));
+            seekIntent.putExtra("podcastEnd", String.valueOf(songEnded));
+
+            sendBroadcast(seekIntent);
+        }
+    }
+
+    // broadcast reciever for seekbar
+    private BroadcastReceiver broadcastReceiver = new BroadcastReceiver(){
+
+        public void onReceive(Context context, Intent intent){
+            updateSeekPos(intent);
+        }
+    };
+
+    //update seek position
+    public void updateSeekPos(Intent intent){
+        int seekPos = intent.getIntExtra("seekpos", 0);
+        if(Globals.mediaPlayer.isPlaying()){
+            handler.removeCallbacks(sendUpdatesToUI);
+            Globals.mediaPlayer.seekTo(seekPos);
+            setupHandler();
+        }
+    }
+    /*===============================================================================
+     ===============================================================================
+    -ON TOUCH LISTENER
+    public void onPause(){
+
+
+        super.onPause();
+
+    }
+
+    protected void onResume(){
+
+        super.onPause();
+    }
+    ===============================================================================
+    ================================================================================*/
+
 }

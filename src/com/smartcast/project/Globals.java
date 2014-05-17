@@ -1,5 +1,6 @@
 package com.smartcast.project;
 
+import android.media.MediaPlayer;
 import android.widget.ImageButton;
 import android.widget.SeekBar;
 /**
@@ -13,4 +14,5 @@ public class Globals {
     public static boolean podcastPlaying = false;
     public static ImageButton btnPlay;
     public static SeekBar seekBarProgress;
+    public static MediaPlayer mediaPlayer = new MediaPlayer();
 }

@@ -3,6 +3,9 @@ package com.smartcast.project;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.IntentFilter;
 import android.view.MotionEvent;
 import android.widget.SeekBar;
 import android.media.MediaPlayer;
@@ -33,7 +36,7 @@ import java.io.IOException;
 
 	 */
 
-public class MainActivity extends ActivityGroup implements View.OnTouchListener {
+public class MainActivity extends ActivityGroup implements SeekBar.OnSeekBarChangeListener {
 
 
 	// Media Player
@@ -49,17 +52,25 @@ public class MainActivity extends ActivityGroup implements View.OnTouchListener 
     private String currentPodcast;
     private int lengthTime;
 
-    //private boolean podcastPlaying = false;
-
+    //vars for the seekbar
+    public SeekBar seekBar;
+    private int seekMax;
+    private static int songEnded = 0;
+    boolean broadcastIsRegistered;
+    //for moving the seekbar
+    public static final String BROADCAST_SEEKBAR = "com.smartcast.project.sendseekbar";
+    Intent seekBarIntent;
 
     // on creation of the app
-	protected void onCreate(Bundle icicle) {
+	public void onCreate(Bundle icicle) {
 		 super.onCreate(icicle);
 		 
 		 setContentView(R.layout.activity_main);
+
          //set the view of the player
          try{
             serviceIntent = new Intent(this, PlayerService.class);
+            seekBarIntent = new Intent(BROADCAST_SEEKBAR);
             initViews();
             putListeners();
             //
@@ -71,8 +82,37 @@ public class MainActivity extends ActivityGroup implements View.OnTouchListener 
 
         Log.w("WAr", "inside");
 	}
+    /*===============================================================================
+      ===============================================================================
+     - SETTING UP SEEK BAR HERE
+     -broadcast reciever to recieve data from the service is in here
 
+     ===============================================================================
+     ================================================================================*/
+    private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            updateUI(intent);// update the seekbar every second as according to the service
 
+        }
+    };
+
+    private void updateUI(Intent intent){
+        //retrieve data from service here
+        String counter = intent.getStringExtra("counter");
+        String podcastMax = intent.getStringExtra("duration");
+        String podcastEnded = intent.getStringExtra("podcastEnded");
+
+        int seekProgress = Integer.parseInt(counter);
+        seekMax = Integer.parseInt(podcastMax);
+      //  songEnded = Integer.parseInt(podcastEnded);
+
+        seekBar.setMax(seekMax);
+        seekBar.setProgress(seekProgress);
+        if(seekProgress == seekMax){
+            Globals.btnPlay.setBackgroundResource(R.drawable.btn_play);
+        }
+    }
 
     /*===============================================================================
       ===============================================================================
@@ -85,7 +125,8 @@ public class MainActivity extends ActivityGroup implements View.OnTouchListener 
 
         //initialize play button
         Globals.btnPlay = (ImageButton) findViewById(R.id.btnPlay);
-
+        //seekbar
+        seekBar = (SeekBar)findViewById(R.id.songProgressBar);
         //media player
         mp = new MediaPlayer();
         podcast_organizer = new PodcastOrganizer();
@@ -137,10 +178,9 @@ public class MainActivity extends ActivityGroup implements View.OnTouchListener 
         // creating tab within two tabhosts
 
 
-        //seekbar
-        Globals.seekBarProgress = (SeekBar)findViewById(R.id.songProgressBar);
-        Globals.seekBarProgress.setMax(99);// means 100%
-        Globals.seekBarProgress.setOnTouchListener(this);
+
+       // Globals.seekBarProgress.setMax(99);// means 100%
+        //Globals.seekBarProgress.setOnTouchListener(this);
 
 
     }
@@ -167,9 +207,11 @@ public class MainActivity extends ActivityGroup implements View.OnTouchListener 
             public void onClick(View arg0) {
                 // check for already playing
                 buttonPlayStopClick();
-                initProgressBar();
+               // initProgressBar();
             }
         });
+        //detect change on seekbar
+        seekBar.setOnSeekBarChangeListener(this);
 	}
 
 	
@@ -182,7 +224,7 @@ public class MainActivity extends ActivityGroup implements View.OnTouchListener 
      ================================================================================*/
     private void buttonPlayStopClick(){
 
-        if(!Globals.podcastPlaying){
+        if(!Globals.podcastPlaying){//if its paused resume
             Globals.btnPlay.setImageResource(R.drawable.btn_pause);
             playPodcast();
             Globals.podcastPlaying = true;
@@ -214,6 +256,9 @@ public class MainActivity extends ActivityGroup implements View.OnTouchListener 
         //add extras to intent
         serviceIntent.putExtra("nextOnQueue", setPodcastLink + nextPodcastToPlay);
 
+        //register reciever for the seekbar
+        registerReceiver(broadcastReceiver, new IntentFilter((PlayerService.BROADCAST_ACTION)));
+        broadcastIsRegistered = true;
         //after that we need to start the service
         try{
             startService(serviceIntent);
@@ -233,9 +278,21 @@ public class MainActivity extends ActivityGroup implements View.OnTouchListener 
      ================================================================================*/
     private void stopPodcastService(){
 
+        //seekBar stuff
+        if(broadcastIsRegistered){
+            try{
+                unregisterReceiver(broadcastReceiver);// stop the reciever broadcast for the seekbar
+                broadcastIsRegistered = false;
+            }
+            catch(Exception e){
+                e.printStackTrace();
+                Toast.makeText(getApplicationContext(), e.getClass().getName() + " " + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
+        }
         //after that we need to start the service
         try{
-            stopService(serviceIntent);
+           // stopService(serviceIntent);
+            onPause();
         }catch(Exception e){
             e.printStackTrace();
             Toast.makeText(getApplicationContext(), e.getClass().getName() + " " + e.getMessage(), Toast.LENGTH_LONG).show();
@@ -257,7 +314,66 @@ public class MainActivity extends ActivityGroup implements View.OnTouchListener 
     }
 
 
-    public void initProgressBar(){
+    /*===============================================================================
+      ===============================================================================
+     -ON RESUME AND ON PAUSE
+
+     ===============================================================================
+     ================================================================================*/
+    protected void onPause(){
+        if(broadcastIsRegistered){
+            try{
+                unregisterReceiver(broadcastReceiver);
+                broadcastIsRegistered = false;
+            }
+            catch(Exception e){
+                e.printStackTrace();
+                Toast.makeText(getApplicationContext(), e.getClass().getName() + " " + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
+        }
+
+        super.onPause();
+        Globals.mediaPlayer.pause();
+
+
+    }
+
+    protected void onResume(){
+        if(!broadcastIsRegistered){
+            try{
+                registerReceiver(broadcastReceiver, new IntentFilter(PlayerService.BROADCAST_ACTION));
+                broadcastIsRegistered = true;
+            }
+            catch(Exception e){
+                e.printStackTrace();
+                Toast.makeText(getApplicationContext(), e.getClass().getName() + " " + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
+        }
+
+        super.onResume();
+
+    }
+
+    /*===============================================================================
+      ===============================================================================
+     -FOR ONSEEKBARCHANGELISTENER IMPLEMTATION METHODS
+
+     ===============================================================================
+     ================================================================================*/
+    public void onProgressChanged(SeekBar sb, int progress, boolean fromUser){
+        if(fromUser){
+            int seekPos = sb.getProgress();
+            seekBarIntent.putExtra("seekpos", seekPos);
+            sendBroadcast(seekBarIntent);
+        }
+
+    }
+
+    public void onStartTrackingTouch(SeekBar seekBar){
+
+    }
+
+    public void onStopTrackingTouch(SeekBar seekBar){
 
     }
 }
